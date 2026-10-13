@@ -1,0 +1,3 @@
+Reference,Qty,Value,Footprint,Why_not_exact,Nearest_on_Robu,Nearest_URL,Datasheet
+"D1,D2,D3,D4",4,SS24L,SOD-123F,Exact MPN SS24L is only HXY (R241435) and is Out of Stock; Vishay SS24L not stocked. In-stock SS24FL is the same SOD-123F 40V 2A Schottky. Original BOM datasheet is the Vishay SS32 sheet.,SS24FL KEXIN 40V 2A SOD-123FL Schottky,https://robu.in/product/ss24fl-kexin-40v-550mv2a-2a-sod-123fl-schottky-diodes-rohs/,https://robu-prod-media.s3.ap-south-1.amazonaws.com/uploads/2024/12/C489144.pdf
+"J2,J3,J4,J5,J6,J7,J8,J9,J10,J11",10,Conn_01x01_Socket,SolderWirePad 1x01 SMD 1x2mm,"Bare exposed SMD solder pad on the PCB for soldering a wire to; it is board copper, not a part you buy. Nothing to source on Robu.",,,
