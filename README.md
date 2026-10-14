@@ -70,3 +70,106 @@ no announced restock date. If lead time matters, Robu's support/B2B channel
 
 Regenerate with `gen_bom.py` (edit the table, re-run) — the checked numbers
 are baked into that file as of the date above.
+
+---
+
+# Weights, modules and budget
+
+`bom-robu-weight-budget.csv` is the same 9-line component list as
+`bom-robu.csv`, with a **weight per component**, plus an nRF52840 module, a
+27 × 27 mm carrier PCB, a placeholder row, an assumed-values row, and a second
+input set (battery, motor, propeller, budget). Component rows are as checked
+2026-10-08; the module / motor additions were checked 2026-10-14.
+
+## Weight column
+
+| Ref | Part | Unit weight | Source |
+|---|---|---|---|
+| BZ1 | CL5020A 5×2 mm buzzer | 0.15 g | typical for a 5×2 mm SMD magnetic buzzer |
+| C1–C4 | 0603 MLCC | 0.004 g | typical 0603 MLCC (BaTiO3 body + terminations) |
+| D1–D4 | SS24FL SOD-123FL | 0.012 g | computed from body dimensions × mold density |
+| D5 | 1N4148W SOD-123 | 0.010 g | Diodes Inc datasheet, "Weight: 0.01 grams (Approximate)" |
+| J1 | 1×4 2.54 mm header | 0.60 g | typical through-hole header |
+| J2–J11 | solder pads | 0.00 g | bare PCB copper |
+| Q1–Q5 | DMN2058U SOT-23 | 0.009 g | Diodes Inc datasheet, "Weight: 0.009 grams (Approximate)" |
+| R (all) | 0603 resistor | 0.002 g | Vishay CRCW0603 datasheet, MASS = 2 mg |
+| U7 | XIAO nRF52840 | 8.00 g | Robu shipping weight 0.008 kg (board itself ≈ 3 g) |
+| PCB1 | 27 × 27 × 1.6 mm FR4 | 2.16 g | 2.7 × 2.7 × 0.16 cm³ × 1.85 g/cm³ |
+
+All 9 passive/board components together weigh **0.887 g**; the build weight is
+dominated by the module and the battery.
+
+## New rows
+
+- **U7 — Seeed Studio XIAO nRF52840** (Robu SKU 1201741). Robu lists **Shipping
+  Weight 0.008 kg**; it is **Out of Stock** as of 2026-10-14. Board size
+  21 × 17.8 mm. The XIAO is a castellated solder-down module: the KiCad/DXF
+  files show **no mounting holes of its own**, only the 14 castellated pads.
+- **PCB1 — carrier PCB**, 27 × 27 mm, 1.6 mm FR4, 2-layer. Holes: **14 pin
+  holes for the XIAO + 8 extra = 22 total** (the "same as the nRF needs plus
+  8 more" rule). If you meant 8 mounting holes total, change the row.
+- **PLACEHOLDER** row — put a category in column C and a weight in column G and
+  the budget formula below picks it up.
+- **ASSUMED** row — one worked example using assumed values.
+
+## Second input set
+
+| Key | Value | Notes |
+|---|---|---|
+| Battery | 1000 mAh 1S LiPo | 3.7 V nominal, 4.2 V full, ≈28 g, ≈3.7 Wh |
+| Motor | 7×20 mm coreless (720) ×4 | ≈2.5 g each, ≈2 A max, ≈28 g thrust each on a 65 mm prop |
+| Propeller | 65 mm 2-blade ×4 | ≈0.5 g each |
+| Budget | ₹5000 | placeholder total |
+
+## Google Sheets remaining-budget formula
+
+Lay the CSV out with **column C = category** and **column G = unit weight**.
+Add a `Rates` sheet mapping a category to a cost per gram in ₹:
+
+```
+Rates!A1:B      A = category, B = INR per gram
+Buzzer          50
+Capacitor       120
+Diode           80
+...
+```
+
+Then, with the total budget in `B1`, the remaining budget is:
+
+```
+=B1 - SUMPRODUCT(G2:G100, ARRAYFORMULA(IFERROR(VLOOKUP(C2:C100, Rates!$A$2:$B$100, 2, FALSE), 0)))
+```
+
+If instead each category has a flat cost (not per gram):
+
+```
+=B1 - SUMPRODUCT((C2:C100<>"") * IFERROR(VLOOKUP(C2:C100, Rates!$A$2:$B$100, 2, FALSE), 0))
+```
+
+And if you keep a per-row cost column (say column L = `=H2*rate`), it is simply:
+
+```
+=B1 - SUM(L2:L100)
+```
+
+## Motor selection (for the brushed-motor device)
+
+The board drives 4 brushed channels (Q1–Q4 + SS24L flyback) plus a 5th channel
+(Q5 + D5). With a 1000 mAh 1S LiPo, the practical coreless-motor options are:
+
+| Motor | Size | Weight | Thrust each (55–65 mm prop) | Max current | Verdict |
+|---|---|---|---|---|---|
+| 615 | 6×15 mm | ≈1.2 g | 13–18 g | ≈1.0–1.3 A | smallest; needs a ≤400 mAh pack |
+| 716 | 7×16 mm | ≈1.9 g | 18–22 g | ≈1.4 A | light option |
+| **720** | **7×20 mm** | **≈2.5 g** | **25–32 g** | **≈1.6–2 A** | **best balance, fits the 2 A SS24L** |
+| 816 | 8×16 mm | ≈2.8 g | 28–34 g | ≈2 A | close to 8520 thrust, in stock |
+| 8520 | 8.5×20 mm | ≈3.6 g | 35–45 g | ≈2.5–3 A | max lift; exceeds the 2 A flyback at full throttle |
+
+Live Indian stock checked 2026-10-14: Robu and Robocraze coreless motors are
+**Out of Stock**; **[QuartzComponents](https://quartzcomponents.com)** has the
+[720 + 55 mm prop](https://quartzcomponents.com/products/720-magnetic-micro-coreless-drone-motor-with-55mm-propeller)
+(₹46), [716 + 55 mm prop](https://quartzcomponents.com/products/716-magnetic-micro-coreless-motor-with-55mm-propeller)
+(₹50), [816](https://quartzcomponents.com/products/816-magnetic-micro-coreless-drone-motor-cw)
+(₹48) and [612](https://quartzcomponents.com/products/612-magnetic-micro-coreless-drone-motor)
+(₹30) in stock. Robu's coreless category and Robocraze's coreless listings were
+Out of Stock at the same check.
