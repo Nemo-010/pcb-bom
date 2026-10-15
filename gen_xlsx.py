@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Write bom-robu-weight-budget.xlsx from the CSV, with live formulas.
 
-No openpyxl available in the sandbox, so this emits the OOXML zip by hand:
-[Content_Types].xml, _rels, xl/workbook.xml, xl/styles.xml and one sheet XML
-per worksheet. Formula cells get a cached value so plain viewers show a number
-and Excel/Sheets recalc on open.
+No openpyxl available in the sandbox, so this emits the OOXML zip by hand.
+Two sheets: BOM (from the CSV) and Budget. Costs are fixed pack costs, so a
+line costs Qty x Unit price (columns D and K); remaining = budget - that sum.
+Formula cells get a cached value so plain viewers show a number and
+Excel/Sheets recalc on open.
 """
 import csv, os, zipfile
 from xml.sax.saxutils import escape
@@ -20,13 +21,14 @@ def col(n):
         s = chr(65 + r) + s
     return s
 
+CACHE = {}
+
 def cell_xml(ref, val, style=None):
     s = f' s="{style}"' if style else ""
     if isinstance(val, str) and val.startswith("="):
-        f = escape(val[1:])
         cached = CACHE.get(ref, "")
         v = f"<v>{cached}</v>" if cached != "" else ""
-        return f'<c r="{ref}"{s}><f>{f}</f>{v}</c>'
+        return f'<c r="{ref}"{s}><f>{escape(val[1:])}</f>{v}</c>'
     if isinstance(val, (int, float)) and not isinstance(val, bool):
         return f'<c r="{ref}"{s}><v>{val}</v></c>'
     if val is None or val == "":
@@ -43,44 +45,26 @@ def sheet_xml(rows):
     out.append("</sheetData></worksheet>")
     return "".join(out)
 
-# cached values for the formulas (Excel/Sheets recalc on open)
-CACHE = {
-    "H21": 15,        # 600 mAh * 0.025 g/mAh
-    "H25": 37.447,    # AUW
-    "H31": 2.9908,    # T/W
-    "H32": 11.2341,   # hover W
-    "H33": 9.4854,    # hover min
-    "H34": 6.3236,    # mixed min
-}
-BUDGET_CACHE = {"B2": 1761, "B3": 1761, "B4": 39.547}
+# ---- BOM sheet from the CSV, with the dynamic battery-weight formula ----
+bom = [list(r) for r in csv.reader(open(CSV, newline=""))]
+bom[20][7] = "=E21*E22"          # H21 battery weight = capacity * g/mAh element
 
-# ---- BOM sheet straight from the CSV, H21 added as a battery-weight formula
-bom = []
-with open(CSV, newline="") as f:
-    for r in csv.reader(f):
-        bom.append(list(r))
-def find(ref):
-    return int("".join(c for c in ref if c.isdigit())), ord(ref[0]) - 64
-r21, c21 = find("H21")
-bom[r21 - 1][c21 - 1] = "=E21*E22"
-
-rates = [["Category", "INR per gram"],
-         ["Buzzer", 50], ["Capacitor", 120], ["Diode", 80], ["Connector", 40],
-         ["SolderPad", 0], ["MOSFET", 200], ["Resistor", 30],
-         ["nRF52840 (Seeed XIAO)", 60], ["Carrier PCB", 40], ["Battery", 25],
-         ["Motor", 150], ["Propeller", 300], ["Custom part (assumed)", 100],
-         ["<cat>", 1]]
-
+# ---- Budget sheet: fixed pack costs ----
 budget = [["Total budget (INR)", "=BOM!E35"],
-          ["Remaining budget (Google Sheets)",
-           "=BOM!E35-SUMPRODUCT(BOM!G2:G100,ARRAYFORMULA(IFERROR(VLOOKUP(BOM!C2:C100,Rates!$A$2:$B$100,2,FALSE),0)))"],
-          ["Remaining budget (Excel)",
-           "=BOM!E35-SUMPRODUCT(SUMIF(Rates!$A$2:$A$100,BOM!$C$2:$C$100,Rates!$B$2:$B$100),BOM!$G$2:$G$100)"],
+          ["BOM cost (INR)", "=SUMPRODUCT(BOM!D2:D100,BOM!K2:K100)"],
+          ["Remaining budget (INR)", "=BOM!E35-SUMPRODUCT(BOM!D2:D100,BOM!K2:K100)"],
           ["Total weight (g)", "=SUM(BOM!H2:H100)"]]
-# fold the budget cached values in
-for i, (a, b) in enumerate(budget, 1):
-    if isinstance(b, str) and b.startswith("="):
-        CACHE.setdefault(f"B{i}", BUDGET_CACHE.get(f"B{i}", ""))
+
+# cached values (Excel/Sheets recalc on open)
+def num(row, col_idx):
+    v = row[col_idx] if col_idx < len(row) else ""
+    try: return float(v)
+    except (TypeError, ValueError): return 0.0
+bom_cost = sum(num(r, 3) * num(r, 10) for r in bom[1:])
+CACHE.update({
+    "H21": 15, "H25": 37.447, "H31": 2.9908, "H32": 11.2341, "H33": 9.4854, "H34": 6.3236,
+    "B2": round(bom_cost, 2), "B3": round(5000 - bom_cost, 2), "B4": 39.547,
+})
 
 CT = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' \
  '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' \
@@ -89,7 +73,6 @@ CT = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' \
  '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' \
  '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' \
  '<Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' \
- '<Override PartName="/xl/worksheets/sheet3.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' \
  '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' \
  '</Types>'
 
@@ -102,16 +85,14 @@ WB = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' \
  '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" ' \
  'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>' \
  '<sheet name="BOM" sheetId="1" r:id="rId1"/>' \
- '<sheet name="Rates" sheetId="2" r:id="rId2"/>' \
- '<sheet name="Budget" sheetId="3" r:id="rId3"/>' \
+ '<sheet name="Budget" sheetId="2" r:id="rId2"/>' \
  '</sheets></workbook>'
 
 WBRELS = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' \
  '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' \
  '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>' \
  '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/>' \
- '<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet3.xml"/>' \
- '<Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>' \
+ '<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>' \
  '</Relationships>'
 
 STYLES = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' \
@@ -133,7 +114,7 @@ with zipfile.ZipFile(XLSX, "w", zipfile.ZIP_DEFLATED) as z:
     z.writestr("xl/_rels/workbook.xml.rels", WBRELS)
     z.writestr("xl/styles.xml", STYLES)
     z.writestr("xl/worksheets/sheet1.xml", sheet_xml(bom))
-    z.writestr("xl/worksheets/sheet2.xml", sheet_xml(rates))
-    z.writestr("xl/worksheets/sheet3.xml", sheet_xml(budget))
+    z.writestr("xl/worksheets/sheet2.xml", sheet_xml(budget))
 
-print("wrote", XLSX, os.path.getsize(XLSX), "bytes")
+print("wrote", XLSX, os.path.getsize(XLSX), "bytes | BOM cost %.2f, remaining %.2f"
+      % (bom_cost, 5000 - bom_cost))

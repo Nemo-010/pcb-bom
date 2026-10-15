@@ -36,28 +36,14 @@ function buildBomSheet() {
   bom.getRange("H25").setNumberFormat("0.00");
   bom.getRange("H31:H34").setNumberFormat("0.00");
 
-  // Rates sheet: category -> INR per gram, used by the budget formula.
-  var rates = ss.insertSheet("Rates");
-  rates.getRange("A1:B1").setValues([["Category", "INR per gram"]]);
-  rates.getRange(2, 1, 14, 2).setValues([
-    ["Buzzer", 50], ["Capacitor", 120], ["Diode", 80], ["Connector", 40],
-    ["SolderPad", 0], ["MOSFET", 200], ["Resistor", 30], ["nRF52840 (Seeed XIAO)", 60],
-    ["Carrier PCB", 40], ["Battery", 25], ["Motor", 150], ["Propeller", 300],
-    ["Custom part (assumed)", 100], ["<cat>", 1]
-  ]);
-  rates.setColumnWidth(1, 220);
-  rates.setFrozenRows(1);
-
-  // Budget sheet: remaining budget from (category in col C, weight in col G).
+  // Budget sheet: parts are fixed packs, so line cost = Qty x Unit price (D x K).
   var bud = ss.insertSheet("Budget");
-  bud.getRange("A1:B1").setValues([["Total budget (INR)", "=BOM!E35"]]);
-  bud.getRange("A2:B2").setValues([[
-    "Remaining budget (INR)",
-    '=BOM!E35 - SUMPRODUCT(BOM!G2:G100, ARRAYFORMULA(IFERROR(VLOOKUP(BOM!C2:C100, Rates!$A$2:$B$100, 2, FALSE), 0)))'
-  ]]);
-  bud.getRange("A3:B3").setValues([[
-    "Total weight (g)", "=SUM(BOM!H2:H100)"
-  ]]);
+  bud.getRange("A1:B4").setValues([
+    ["Total budget (INR)", "=BOM!E35"],
+    ["BOM cost (INR)", "=SUMPRODUCT(BOM!D2:D100,BOM!K2:K100)"],
+    ["Remaining budget (INR)", "=BOM!E35-SUMPRODUCT(BOM!D2:D100,BOM!K2:K100)"],
+    ["Total weight (g)", "=SUM(BOM!H2:H100)"]
+  ]);
   bud.setColumnWidth(1, 220);
 
   if (SHARE_WITH) {

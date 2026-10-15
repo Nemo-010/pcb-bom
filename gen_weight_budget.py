@@ -95,7 +95,7 @@ rows = [
  ["CALC","FLY_HOVER","Flight time (hover)",1,"min","","","=E21/1000*E29*E30/H32*60","=mAh/1000 x V x DoD / hover power x 60","","","n/a","",""],
  ["CALC","FLY_MIXED","Flight time (mixed)",1,"min","","","=H33/1.5","hover / 1.5 for normal flying","","","n/a","",""],
  # row 35: budget
- ["INPUT","BUDGET","Budget",1,5000,"INR","","","input","","5000","n/a","","Cell E35 = total budget"],
+ ["INPUT","BUDGET","Budget",1,5000,"INR","","","input","","","n/a","","Cell E35 = total budget (kept out of the price column so it is not counted as a cost)"],
 ]
 
 with open(f"{OUT}/bom-robu-weight-budget.csv","w",newline="") as f:
