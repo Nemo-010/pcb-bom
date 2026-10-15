@@ -213,3 +213,26 @@ frame/wire/connector row (use the PLACEHOLDER row) and AUW rises and time
 falls. A 600 mAh 25C pack supplies 15 A, and the four 720s pull ≈6.8 A at full
 throttle, so the pack is fine; the SS24L 2 A flyback is the thing to watch at
 full stick.
+
+## Getting this into a Google Sheet
+
+This repo can't create a Google Sheet for you (no Google credentials are
+available here). Two ways to get one, both fully in your account:
+
+**A. Build it with Apps Script (recommended, gives live formulas).**
+
+1. Open <https://script.google.com> → **New project**.
+2. Paste [`build-google-sheet.gs`](build-google-sheet.gs).
+3. Set `SHARE_WITH` to your Google address (or leave `""` for private).
+4. Run `buildBomSheet` and approve the prompt. The log prints the sheet URL.
+
+It pulls this repo's CSV, writes the BOM with the formula cells live, adds a
+`Rates` sheet (category → ₹/g) and a `Budget` sheet with the remaining-budget
+and total-weight formulas.
+
+**B. Import the CSV by hand.**
+
+1. Open <https://sheets.new> → **File → Import → Upload**.
+2. Pick `bom-robu-weight-budget.csv`; import as a new sheet.
+3. Add a `Rates` sheet (`Category`, `INR per gram`) and put in `Budget!B2`:
+   `=BOM!E35 - SUMPRODUCT(BOM!G2:G100, ARRAYFORMULA(IFERROR(VLOOKUP(BOM!C2:C100, Rates!$A$2:$B$100, 2, FALSE), 0)))`
