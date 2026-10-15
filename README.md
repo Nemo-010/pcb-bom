@@ -173,3 +173,43 @@ Live Indian stock checked 2026-10-14: Robu and Robocraze coreless motors are
 (₹48) and [612](https://quartzcomponents.com/products/612-magnetic-micro-coreless-drone-motor)
 (₹30) in stock. Robu's coreless category and Robocraze's coreless listings were
 Out of Stock at the same check.
+
+## Dynamic battery weight, AUW and flight time
+
+The battery weight is **computed**, not hard-coded, from its capacity and a
+weight element (grams per mAh):
+
+```
+Battery_Weight_g = capacity_mAh * weight_element_g_per_mAh
+```
+
+- `E21` = capacity in mAh (default **600**)
+- `E22` = weight element in g/mAh (default **0.025**, i.e. ≈150 Wh/kg at 3.7 V)
+- `H21` = `=E21*E22`
+
+Everything downstream is live, so changing `E21` re-does the whole sheet:
+
+| Cell | Meaning | Formula |
+|---|---|---|
+| `H25` | total flying weight (AUW), J1/DNP excluded | `=H2+H3+H4+H6+H7+H8+H9+H10+H11+H12+H23+H24+(E21*E22)` |
+| `H31` | thrust / weight | `=4*E26/H25` |
+| `H32` | hover power (W) | `=H25*E28` |
+| `H33` | hover time (min) | `=E21/1000*E29*E30/H32*60` |
+| `H34` | mixed-flight time (min) | `=H33/1.5` |
+
+Parameters: `E26` motor max thrust = 28 g, `E27` motor max current = 1.7 A,
+`E28` hover specific power = 0.30 W/g, `E29` cell voltage = 3.7 V,
+`E30` usable depth of discharge = 0.8.
+
+### 600 mAh + 7×20 (720) result
+
+| Capacity | AUW | T/W | Hover time | Mixed flying |
+|---|---|---|---|---|
+| **600 mAh** | ≈37.4 g | 3.0 | **≈9.5 min** | **≈6.3 min** |
+| 1000 mAh | ≈47.4 g | 2.4 | ≈12.5 min | ≈8.3 min |
+
+Notes: this is with 65 mm props and a hover specific power of 0.30 W/g. Add a
+frame/wire/connector row (use the PLACEHOLDER row) and AUW rises and time
+falls. A 600 mAh 25C pack supplies 15 A, and the four 720s pull ≈6.8 A at full
+throttle, so the pack is fine; the SS24L 2 A flyback is the thing to watch at
+full stick.
